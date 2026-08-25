@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { orders, type OrderItem } from "@/lib/store";
+import { addOrder, type OrderItem } from "@/lib/store";
 
 export async function POST(request: Request) {
   let items: OrderItem[] = [];
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     createdAt: new Date().toISOString(),
   };
 
-  orders.push(order);
+  await addOrder(order);
 
   return NextResponse.json({ ok: true, orderId: order.id, total });
 }
