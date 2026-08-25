@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 export interface Subscriber {
@@ -25,7 +26,13 @@ interface Store {
   orders: Order[];
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
+// On serverless platforms (Vercel) the working directory is read-only,
+// so we fall back to the writable temp dir. Locally we use ./data.
+const isServerless =
+  process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+const DATA_DIR = isServerless
+  ? path.join(os.tmpdir(), "noir-form-data")
+  : path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
 
 async function readStore(): Promise<Store> {
@@ -42,8 +49,13 @@ async function readStore(): Promise<Store> {
 }
 
 async function writeStore(store: Store): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(DATA_FILE, JSON.stringify(store, null, 2), "utf8");
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(DATA_FILE, JSON.stringify(store, null, 2), "utf8");
+  } catch {
+    // Persistence is best-effort (e.g. read-only FS on some hosts).
+    // The API still returns success; data may not survive on serverless.
+  }
 }
 
 export async function addSubscriber(email: string): Promise<{
